@@ -1,0 +1,70 @@
+services:
+  webserver:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecommerce-webserver
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ecommerce_backend_vendor:/var/www/html/vendor
+    environment:
+      APP_NAME: E-Commerce API
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://127.0.0.1:8080
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ecommerce
+      DB_USERNAME: ecommerce
+      DB_PASSWORD: secret
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SESSION_DRIVER: file
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    container_name: ecommerce-mysql
+    restart: unless-stopped
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_DATABASE: ecommerce
+      MYSQL_USER: ecommerce
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ecommerce_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecommerce-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - ecommerce_frontend_node_modules:/app/node_modules
+    environment:
+      VITE_API_URL: http://127.0.0.1:8080/api
+    depends_on:
+      - webserver
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  ecommerce_backend_vendor:
+  ecommerce_frontend_node_modules:
+  ecommerce_mysql_data:
